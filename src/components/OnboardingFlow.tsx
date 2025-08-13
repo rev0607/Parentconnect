@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
 import { AuthScreen } from './onboarding/AuthScreen';
 import { ParentChildSetup } from './onboarding/ParentChildSetup';
-import LanguageSelection from './onboarding/LanguageSelection';
+import { LanguageSelection } from './onboarding/LanguageSelection';
 import { Permissions } from './onboarding/Permissions';
 import { WarmWelcome } from './onboarding/WarmWelcome';
 import { Child, Parent } from '../types';
@@ -84,11 +84,9 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
         return (
           <LanguageSelection
             selectedLanguage={preferredLanguage}
-            onLanguageSelect={setPreferredLanguage}
-            onNext={nextStep}
+            onLanguageChange={setPreferredLanguage}
             onBack={prevStep}
-            currentStep={currentStep + 1}
-            totalSteps={steps.length}
+            onContinue={nextStep}
           />
         );
       case 'permissions':

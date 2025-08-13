@@ -2,12 +2,10 @@ import React from 'react';
 import { ChevronLeft, Globe, Check } from 'lucide-react';
 
 interface LanguageSelectionProps {
-  onBack: () => void;
+  onLanguageChange: (language: string) => void;
   onContinue: () => void;
   selectedLanguage: string;
   onLanguageChange: (language: string) => void;
-}
-
 const languages = [
   { code: 'en', name: 'English', flag: '🇺🇸' },
   { code: 'hi', name: 'हिंदी (Hindi)', flag: '🇮🇳' },
