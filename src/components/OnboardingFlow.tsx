@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
 import { AuthScreen } from './onboarding/AuthScreen';
 import { ParentChildSetup } from './onboarding/ParentChildSetup';
-import { LanguageSelection } from './onboarding/LanguageSelection';
+import LanguageSelection from './onboarding/LanguageSelection';
 import { Permissions } from './onboarding/Permissions';
 import { WarmWelcome } from './onboarding/WarmWelcome';
 import { Child, Parent } from '../types';
