@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
-import { RoleSelection } from './onboarding/RoleSelection';
-import { ChildDetails } from './onboarding/ChildDetails';
+import { AuthScreen } from './onboarding/AuthScreen';
+import { ParentChildSetup } from './onboarding/ParentChildSetup';
 import { LanguageSelection } from './onboarding/LanguageSelection';
 import { Permissions } from './onboarding/Permissions';
-import { ParentProfile } from './onboarding/ParentProfile';
-import { OnboardingComplete } from './onboarding/OnboardingComplete';
+import { WarmWelcome } from './onboarding/WarmWelcome';
 import { Child, Parent } from '../types';
 
 interface OnboardingFlowProps {
@@ -16,17 +15,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [currentStep, setCurrentStep] = useState(0);
   const [children, setChildren] = useState<Child[]>([]);
   const [parent, setParent] = useState<Parent | null>(null);
-  const [selectedRole, setSelectedRole] = useState<'parent' | 'student'>('parent');
   const [preferredLanguage, setPreferredLanguage] = useState('English');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const steps = [
     'welcome',
-    'role',
-    'child-details',
+    'auth',
+    'parent-child-setup',
     'language',
     'permissions',
-    'parent-profile',
-    'complete'
+    'warm-welcome'
   ];
 
   const nextStep = () => {
@@ -49,6 +47,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     setParent(parentData);
   };
 
+  const handleAuth = (authData: any) => {
+    setIsAuthenticated(true);
+  };
+
   const handleComplete = () => {
     onComplete(children);
   };
@@ -56,23 +58,26 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const renderStep = () => {
     switch (steps[currentStep]) {
       case 'welcome':
-        return <WelcomeScreen onNext={nextStep} />;
-      case 'role':
+        return <WelcomeScreen onNext={nextStep} onSkip={() => setCurrentStep(steps.length - 1)} />;
+      case 'auth':
         return (
-          <RoleSelection
-            selectedRole={selectedRole}
-            onRoleSelect={setSelectedRole}
+          <AuthScreen
+            onAuth={handleAuth}
             onNext={nextStep}
             onBack={prevStep}
+            onSkip={() => setCurrentStep(steps.length - 1)}
           />
         );
-      case 'child-details':
+      case 'parent-child-setup':
         return (
-          <ChildDetails
+          <ParentChildSetup
             children={children}
+            parent={parent}
             onChildrenUpdate={handleChildrenUpdate}
+            onParentUpdate={handleParentUpdate}
             onNext={nextStep}
             onBack={prevStep}
+            onSkip={() => setCurrentStep(steps.length - 1)}
           />
         );
       case 'language':
@@ -82,23 +87,32 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             onLanguageSelect={setPreferredLanguage}
             onNext={nextStep}
             onBack={prevStep}
+            currentStep={currentStep + 1}
+            totalSteps={steps.length}
           />
         );
       case 'permissions':
-        return <Permissions onNext={nextStep} onBack={prevStep} />;
-      case 'parent-profile':
         return (
-          <ParentProfile
-            parent={parent}
-            onParentUpdate={handleParentUpdate}
-            onNext={nextStep}
+          <Permissions 
+            onNext={nextStep} 
             onBack={prevStep}
+            currentStep={currentStep + 1}
+            totalSteps={steps.length}
           />
         );
-      case 'complete':
-        return <OnboardingComplete onComplete={handleComplete} />;
+      case 'warm-welcome':
+        return (
+          <WarmWelcome
+            parent={parent}
+            children={children}
+            onComplete={handleComplete}
+            onBack={prevStep}
+            currentStep={currentStep + 1}
+            totalSteps={steps.length}
+          />
+        );
       default:
-        return <WelcomeScreen onNext={nextStep} />;
+        return <WelcomeScreen onNext={nextStep} onSkip={() => setCurrentStep(steps.length - 1)} />;
     }
   };
 

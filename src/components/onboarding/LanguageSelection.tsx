@@ -6,6 +6,8 @@ interface LanguageSelectionProps {
   onLanguageSelect: (language: string) => void;
   onNext: () => void;
   onBack: () => void;
+  currentStep: number;
+  totalSteps: number;
 }
 
 export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
@@ -13,6 +15,8 @@ export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
   onLanguageSelect,
   onNext,
   onBack,
+  currentStep,
+  totalSteps,
 }) => {
   const languages = [
     { code: 'English', name: 'English', flag: '🇺🇸' },
@@ -22,8 +26,28 @@ export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
   ];
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
+      {/* Header */}
+          {/* Progress Indicator */}
+          <div className="flex justify-center mb-6">
+            <div className="flex space-x-2">
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <div 
+                  key={i} 
+                  className={`w-2 h-2 rounded-full ${
+                    i < currentStep ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
+        <div className="w-6"></div> {/* Spacer */}
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Globe className="w-8 h-8 text-white" />
@@ -75,11 +99,12 @@ export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
           <button
             onClick={onNext}
             className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-teal-700 transition-all"
-          >
+            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-green-600 to-teal-600 text-white py-3 px-4 rounded-lg hover:from-green-700 hover:to-teal-700 transition-all font-medium"
             <span>Continue</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
+      </div>
       </div>
     </div>
   );

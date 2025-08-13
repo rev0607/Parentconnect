@@ -4,9 +4,11 @@ import { ArrowRight, ArrowLeft, Bell, MessageSquare, Shield } from 'lucide-react
 interface PermissionsProps {
   onNext: () => void;
   onBack: () => void;
+  currentStep: number;
+  totalSteps: number;
 }
 
-export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack }) => {
+export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack, currentStep, totalSteps }) => {
   const [permissions, setPermissions] = useState({
     notifications: true,
     whatsapp: false,
@@ -17,23 +19,16 @@ export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack }) => {
     {
       key: 'notifications' as keyof typeof permissions,
       icon: Bell,
-      title: 'Push Notifications',
-      description: 'Get reminders about homework, exams, and progress updates',
+      title: 'Notifications',
+      description: 'Homework, exam alerts, progress updates, AI reminders',
       recommended: true,
     },
     {
       key: 'whatsapp' as keyof typeof permissions,
       icon: MessageSquare,
       title: 'WhatsApp Integration',
-      description: 'Share progress reports and receive updates via WhatsApp',
+      description: 'On/Off',
       recommended: false,
-    },
-    {
-      key: 'analytics' as keyof typeof permissions,
-      icon: Shield,
-      title: 'Learning Analytics',
-      description: 'Help us improve AI recommendations with anonymous usage data',
-      recommended: true,
     },
   ];
 
@@ -42,8 +37,22 @@ export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
+      {/* Header */}
+      <div className="flex justify-between items-center p-6">
+        <button
+          onClick={onBack}
+          className="flex items-center space-x-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span>Back</span>
+        </button>
+        <div className="w-6"></div> {/* Spacer */}
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-6">
+        <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
         <div className="text-center mb-8">
           <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <Shield className="w-8 h-8 text-white" />
@@ -91,26 +100,32 @@ export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack }) => {
           ))}
         </div>
 
-        <div className="flex space-x-3">
-          <button
-            onClick={onBack}
-            className="flex-1 flex items-center justify-center space-x-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-3 px-4 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Back</span>
-          </button>
+          {/* Progress Indicator */}
+          <div className="flex justify-center mb-6">
+            <div className="flex space-x-2">
+              {Array.from({ length: totalSteps }, (_, i) => (
+                <div 
+                  key={i} 
+                  className={`w-2 h-2 rounded-full ${
+                    i < currentStep ? 'bg-blue-600' : 'bg-gray-300 dark:bg-gray-600'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+
           <button
             onClick={onNext}
-            className="flex-1 flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all"
+            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-medium"
           >
             <span>Continue</span>
             <ArrowRight className="w-4 h-4" />
           </button>
-        </div>
 
         <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
           You can change these settings anytime in the app preferences
         </p>
+        </div>
       </div>
     </div>
   );

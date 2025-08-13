@@ -31,7 +31,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
           <div>
             <h1 className="text-lg font-semibold text-gray-900 dark:text-white">
-              EduParent
+              Smart Parent AI
             </h1>
             <p className="text-sm text-gray-600 dark:text-gray-300">
               {activeChild.name}'s Dashboard
