@@ -7,7 +7,7 @@ import { ParentChildSetup } from './onboarding/ParentChildSetup';
 import { LanguageSelection } from './onboarding/LanguageSelection';
 import { Permissions } from './onboarding/Permissions';
 import { WarmWelcome } from './onboarding/WarmWelcome';
-import { OnboardingService } from '../services/onboardingService';
+import { AuthService } from '../services/authService';
 import type { Parent as DBParent, Child as DBChild } from '../lib/supabase';
 
 // Legacy types for compatibility
@@ -37,14 +37,22 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const handleAuthSuccess = useCallback(async (user: any) => {
     try {
       console.log('Handling auth success for user:', user);
+      console.log('User metadata:', user.user_metadata);
+      console.log('User identities:', user.identities);
       
       // Create or update parent profile
       const { parent: parentData, error } = await AuthService.createOrUpdateParent({
         google_id: user.id,
-        first_name: user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.name?.split(' ')[0] || '',
-        last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
+        first_name: user.user_metadata?.full_name?.split(' ')[0] || 
+                   user.user_metadata?.name?.split(' ')[0] || 
+                   user.user_metadata?.given_name || 
+                   'User',
+        last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || 
+                  user.user_metadata?.name?.split(' ').slice(1).join(' ') || 
+                  user.user_metadata?.family_name || 
+                  '',
         email: user.email || '',
-        phone: user.user_metadata?.phone_number || ''
+        phone: user.user_metadata?.phone_number || user.phone || ''
       });
 
       if (error) {
@@ -63,8 +71,9 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       setAuthUser(user);
       setIsAuthenticated(true);
       
-      // Move to profile setup step
-      setCurrentStep(2);
+      // Move to profile setup step (step 3, index 2)
+      console.log('Moving to profile setup step');
+      setCurrentStep(2); // This is step 3 (ParentChildSetup)
     } catch (err) {
       console.error('Auth success handler error:', err);
     }
@@ -77,9 +86,16 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     const checkSession = async () => {
       try {
         setIsLoading(true);
+        console.log('Checking existing session...');
         
         // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          setIsLoading(false);
+          return;
+        }
         
         if (session?.user && mounted) {
           console.log('Existing session found:', session.user);
@@ -100,10 +116,13 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session);
+      console.log('Current step before auth change:', currentStep);
       
       if (event === 'SIGNED_IN' && session?.user && mounted) {
+        console.log('User signed in, calling handleAuthSuccess');
         await handleAuthSuccess(session.user);
       } else if (event === 'SIGNED_OUT' && mounted) {
+        console.log('User signed out, resetting state');
         setIsAuthenticated(false);
         setAuthUser(null);
         setParent(null);
@@ -158,7 +177,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const handleComplete = async () => {
     // Load children from database for the main app
     if (parent) {
-      const { children: dbChildren } = await OnboardingService.getChildrenByParentId(parent.id);
+      const { children: dbChildren } = await AuthService.getChildrenByParentId(parent.id);
       
       if (dbChildren) {
         // Convert DB children to legacy format for compatibility
@@ -188,7 +207,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
           <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 animate-pulse">
             <span className="text-white font-bold text-2xl">AI</span>
           </div>
-          <p className="text-gray-600 dark:text-gray-300">Loading...</p>
+          <p className="text-gray-600 dark:text-gray-300">Checking authentication...</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Current step: {currentStep + 1}</p>
         </div>
       </div>
     );
@@ -205,6 +225,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             onNext={nextStep}
             onBack={prevStep}
             onSkip={() => setCurrentStep(steps.length - 1)}
+            isAuthenticated={isAuthenticated}
+            authUser={authUser}
           />
         );
       case 'parent-child-setup':

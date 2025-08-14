@@ -8,48 +8,69 @@ interface AuthScreenProps {
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
+  isAuthenticated?: boolean;
+  authUser?: any;
 }
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, onSkip }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ 
+  onAuth, 
+  onNext, 
+  onBack, 
+  onSkip, 
+  isAuthenticated = false,
+  authUser = null 
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // If already authenticated, show success state and auto-advance
   useEffect(() => {
-    // Check if user is already authenticated and handle OAuth callback
-    const checkAuth = async () => {
-      try {
-        // Handle OAuth callback from URL
-        const { data, error } = await supabase.auth.getSession();
-        
-        if (error) {
-          console.error('Session error:', error);
-          return;
-        }
+    if (isAuthenticated && authUser) {
+      console.log('User is already authenticated, auto-advancing...');
+      setTimeout(() => {
+        onNext();
+      }, 1500); // Give user time to see success message
+    }
+  }, [isAuthenticated, authUser, onNext]);
 
-        if (data.session?.user) {
-          console.log('User authenticated:', data.session.user);
-          await handleAuthSuccess(data.session.user);
+  useEffect(() => {
+    // Handle URL hash parameters (OAuth callback)
+    const handleOAuthCallback = async () => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      
+      if (accessToken) {
+        console.log('OAuth callback detected with access token');
+        setIsLoading(true);
+        
+        try {
+          const { data, error } = await supabase.auth.getSession();
+          if (error) throw error;
+          
+          if (data.session?.user) {
+            console.log('Session established from OAuth callback');
+            // The auth state listener in OnboardingFlow will handle this
+          }
+        } catch (err) {
+          console.error('OAuth callback error:', err);
+          setError('Authentication failed. Please try again.');
+        } finally {
+          setIsLoading(false);
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
         }
-      } catch (err) {
-        console.error('Auth check error:', err);
       }
     };
-    
-    checkAuth();
 
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session);
-      
-      if (event === 'SIGNED_IN' && session?.user) {
-        await handleAuthSuccess(session.user);
-      }
-    });
-
-    return () => subscription.unsubscribe();
+    handleOAuthCallback();
   }, []);
 
   const handleGoogleSignIn = async () => {
+    if (isAuthenticated) {
+      onNext();
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -59,10 +80,11 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}${window.location.pathname}`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
+            scope: 'openid email profile'
           }
         }
       });
@@ -83,6 +105,21 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
       setIsLoading(false);
     }
   };
+
+  // Show success state if authenticated
+  if (isAuthenticated && authUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-green-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <span className="text-white text-2xl">✓</span>
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Welcome!</h2>
+          <p className="text-gray-600 dark:text-gray-300">Successfully signed in. Proceeding to setup...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900 flex flex-col">
@@ -125,6 +162,14 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
           )}
 
           <div className="space-y-4">
+            {/* Debug Info */}
+            {process.env.NODE_ENV === 'development' && (
+              <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">
+                <p>Auth Status: {isAuthenticated ? 'Authenticated' : 'Not authenticated'}</p>
+                <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
+              </div>
+            )}
+
             {/* Google Sign In Button */}
             <button
               onClick={handleGoogleSignIn}
@@ -139,7 +184,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
                 </div>
               )}
               <span className="text-gray-700 dark:text-gray-300 font-medium">
-                {isLoading ? 'Signing in...' : 'Continue with Google'}
+                {isLoading ? 'Signing in...' : isAuthenticated ? 'Continue to Setup' : 'Continue with Google'}
               </span>
             </button>
 

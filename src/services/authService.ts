@@ -119,6 +119,23 @@ export class AuthService {
     }
   }
 
+  // Get children by parent ID
+  static async getChildrenByParentId(parentId: string): Promise<{ children: any[] | null; error: any }> {
+    try {
+      const { data, error } = await supabase
+        .from('children')
+        .select('*')
+        .eq('parent_id', parentId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return { children: data, error: null };
+    } catch (error) {
+      console.error('Get children error:', error);
+      return { children: null, error };
+    }
+  }
+
   // Log activity
   static async logActivity(parentId: string, onboardingStep?: string) {
     try {
