@@ -22,6 +22,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<any>(null);
 
   // If already authenticated, show success state and auto-advance
   useEffect(() => {
@@ -36,29 +37,46 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   useEffect(() => {
     // Handle URL hash parameters (OAuth callback)
     const handleOAuthCallback = async () => {
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
+      console.log('Checking for OAuth callback...');
+      console.log('Current URL:', window.location.href);
+      console.log('Hash:', window.location.hash);
+      console.log('Search:', window.location.search);
       
-      if (accessToken) {
-        console.log('OAuth callback detected with access token');
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const searchParams = new URLSearchParams(window.location.search);
+      const accessToken = hashParams.get('access_token');
+      const code = searchParams.get('code');
+      
+      if (accessToken || code) {
+        console.log('OAuth callback detected:', { accessToken: !!accessToken, code: !!code });
         setIsLoading(true);
         
         try {
+          // Let Supabase handle the OAuth callback
           const { data, error } = await supabase.auth.getSession();
+          console.log('Session after OAuth:', data, error);
+          
           if (error) throw error;
           
           if (data.session?.user) {
             console.log('Session established from OAuth callback');
+            setDebugInfo({ oauthSuccess: true, user: data.session.user.email });
             // The auth state listener in OnboardingFlow will handle this
+          } else {
+            console.log('No session found after OAuth callback');
+            setDebugInfo({ oauthCallback: true, noSession: true });
           }
         } catch (err) {
           console.error('OAuth callback error:', err);
+          setDebugInfo({ oauthError: err instanceof Error ? err.message : 'Unknown OAuth error' });
           setError('Authentication failed. Please try again.');
         } finally {
           setIsLoading(false);
           // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname);
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.search.replace(/[?&](code|state)=[^&]*/g, '').replace(/^&/, '?').replace(/^\?$/, ''));
         }
+      } else {
+        console.log('No OAuth callback detected');
       }
     };
 
@@ -73,9 +91,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
     setIsLoading(true);
     setError(null);
+    setDebugInfo(null);
 
     try {
       console.log('Initiating Google sign in...');
+      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
+      console.log('Supabase Anon Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
+      // Check if Supabase is properly configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        throw new Error('Supabase configuration missing. Please check your environment variables.');
+      }
       
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -91,16 +117,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       
       if (error) {
         console.error('Google sign in error:', error);
+        setDebugInfo({ error: error.message, code: error.status });
         setError(error.message);
         setIsLoading(false);
         return;
       }
 
       console.log('Google sign in initiated:', data);
+      setDebugInfo({ success: true, data });
       // The redirect will happen automatically
       // Don't set loading to false here as we're redirecting
     } catch (err) {
       console.error('Sign in error:', err);
+      setDebugInfo({ catchError: err instanceof Error ? err.message : 'Unknown error' });
       setError('Failed to sign in with Google. Please try again.');
       setIsLoading(false);
     }
@@ -161,12 +190,23 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </div>
           )}
 
+          {/* Debug Info in Development */}
+          {process.env.NODE_ENV === 'development' && debugInfo && (
+            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-yellow-800 dark:text-yellow-200 text-xs font-mono">
+                Debug: {JSON.stringify(debugInfo, null, 2)}
+              </p>
+            </div>
+          )}
+
           <div className="space-y-4">
             {/* Debug Info */}
             {process.env.NODE_ENV === 'development' && (
               <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">
                 <p>Auth Status: {isAuthenticated ? 'Authenticated' : 'Not authenticated'}</p>
                 <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
+                <p>Supabase URL: {import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing'}</p>
+                <p>Supabase Key: {import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing'}</p>
               </div>
             )}
 
