@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Mail, Loader2 } from 'lucide-react';
 import { AuthService } from '../../services/authService';
+import { supabase } from '../../lib/supabase';
 
 interface AuthScreenProps {
   onAuth: (authData: any) => void;
@@ -14,15 +15,38 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is already authenticated
+    // Check if user is already authenticated and handle OAuth callback
     const checkAuth = async () => {
-      const { session } = await AuthService.getCurrentSession();
-      if (session?.user) {
-        handleAuthSuccess(session.user);
+      try {
+        // Handle OAuth callback from URL
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Session error:', error);
+          return;
+        }
+
+        if (data.session?.user) {
+          console.log('User authenticated:', data.session.user);
+          await handleAuthSuccess(data.session.user);
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
       }
     };
     
     checkAuth();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state changed:', event, session);
+      
+      if (event === 'SIGNED_IN' && session?.user) {
+        await handleAuthSuccess(session.user);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   const handleGoogleSignIn = async () => {
@@ -30,17 +54,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
     setError(null);
 
     try {
-      const { data, error } = await AuthService.signInWithGoogle();
+      console.log('Initiating Google sign in...');
+      
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}`,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
+      });
       
       if (error) {
+        console.error('Google sign in error:', error);
         setError(error.message);
         setIsLoading(false);
         return;
       }
 
-      // The actual authentication will be handled by the redirect
-      // We'll check for the session in useEffect
+      console.log('Google sign in initiated:', data);
+      // The redirect will happen automatically
     } catch (err) {
+      console.error('Sign in error:', err);
       setError('Failed to sign in with Google. Please try again.');
       setIsLoading(false);
     }
@@ -48,19 +85,25 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
 
   const handleAuthSuccess = async (user: any) => {
     try {
+      console.log('Handling auth success for user:', user);
+      
       // Create or update parent profile
       const { parent, error } = await AuthService.createOrUpdateParent({
         google_id: user.id,
-        first_name: user.user_metadata?.given_name || '',
-        last_name: user.user_metadata?.family_name || '',
+        first_name: user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.name?.split(' ')[0] || '',
+        last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
         email: user.email || '',
-        phone: user.user_metadata?.phone || ''
+        phone: user.user_metadata?.phone_number || ''
       });
 
       if (error) {
+        console.error('Profile creation error:', error);
         setError('Failed to create profile. Please try again.');
+        setIsLoading(false);
         return;
       }
+
+      console.log('Parent profile created/updated:', parent);
 
       // Log authentication activity
       if (parent) {
@@ -68,9 +111,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
       }
 
       onAuth({ user, parent });
+      setIsLoading(false);
       onNext();
     } catch (err) {
+      console.error('Auth success handler error:', err);
       setError('Failed to complete authentication. Please try again.');
+      setIsLoading(false);
     }
   };
 

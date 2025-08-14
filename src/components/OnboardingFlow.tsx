@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useEffect } from 'react';
+import { supabase } from '../lib/supabase';
 import { WelcomeScreen } from './onboarding/WelcomeScreen';
 import { AuthScreen } from './onboarding/AuthScreen';
 import { ParentChildSetup } from './onboarding/ParentChildSetup';
@@ -30,6 +32,21 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [preferredLanguage, setPreferredLanguage] = useState('English');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authUser, setAuthUser] = useState<any>(null);
+
+  // Check for existing session on component mount
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        // User is already authenticated, skip to profile setup
+        setIsAuthenticated(true);
+        setAuthUser(session.user);
+        setCurrentStep(2); // Skip to profile setup
+      }
+    };
+    
+    checkSession();
+  }, []);
 
   const steps = [
     'welcome',

@@ -2,28 +2,6 @@ import { supabase } from '../lib/supabase';
 import type { Parent } from '../lib/supabase';
 
 export class AuthService {
-  // Sign in with Google
-  static async signInWithGoogle() {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
-        }
-      });
-
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      console.error('Google sign in error:', error);
-      return { data: null, error };
-    }
-  }
-
   // Sign out
   static async signOut() {
     try {
@@ -69,6 +47,8 @@ export class AuthService {
     phone?: string;
   }): Promise<{ parent: Parent | null; error: any }> {
     try {
+      console.log('Creating/updating parent with data:', userData);
+      
       // First, try to find existing parent
       const { data: existingParent, error: findError } = await supabase
         .from('parents')
@@ -77,10 +57,12 @@ export class AuthService {
         .single();
 
       if (findError && findError.code !== 'PGRST116') {
+        console.error('Find parent error:', findError);
         throw findError;
       }
 
       if (existingParent) {
+        console.log('Updating existing parent:', existingParent.id);
         // Update existing parent
         const { data, error } = await supabase
           .from('parents')
@@ -95,8 +77,10 @@ export class AuthService {
           .single();
 
         if (error) throw error;
+        console.log('Parent updated successfully:', data);
         return { parent: data, error: null };
       } else {
+        console.log('Creating new parent');
         // Create new parent
         const { data, error } = await supabase
           .from('parents')
@@ -105,6 +89,7 @@ export class AuthService {
           .single();
 
         if (error) throw error;
+        console.log('Parent created successfully:', data);
         return { parent: data, error: null };
       }
     } catch (error) {
