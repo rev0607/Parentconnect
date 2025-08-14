@@ -59,7 +59,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}`,
+          redirectTo: window.location.origin,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
@@ -76,46 +76,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
 
       console.log('Google sign in initiated:', data);
       // The redirect will happen automatically
+      // Don't set loading to false here as we're redirecting
     } catch (err) {
       console.error('Sign in error:', err);
       setError('Failed to sign in with Google. Please try again.');
-      setIsLoading(false);
-    }
-  };
-
-  const handleAuthSuccess = async (user: any) => {
-    try {
-      console.log('Handling auth success for user:', user);
-      
-      // Create or update parent profile
-      const { parent, error } = await AuthService.createOrUpdateParent({
-        google_id: user.id,
-        first_name: user.user_metadata?.full_name?.split(' ')[0] || user.user_metadata?.name?.split(' ')[0] || '',
-        last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || user.user_metadata?.name?.split(' ').slice(1).join(' ') || '',
-        email: user.email || '',
-        phone: user.user_metadata?.phone_number || ''
-      });
-
-      if (error) {
-        console.error('Profile creation error:', error);
-        setError('Failed to create profile. Please try again.');
-        setIsLoading(false);
-        return;
-      }
-
-      console.log('Parent profile created/updated:', parent);
-
-      // Log authentication activity
-      if (parent) {
-        await AuthService.logActivity(parent.id, 'authentication');
-      }
-
-      onAuth({ user, parent });
-      setIsLoading(false);
-      onNext();
-    } catch (err) {
-      console.error('Auth success handler error:', err);
-      setError('Failed to complete authentication. Please try again.');
       setIsLoading(false);
     }
   };
