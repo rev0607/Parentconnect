@@ -25,14 +25,18 @@ export const BottomNavigation: React.FC<BottomNavigationProps> = ({
           <button
             key={id}
             onClick={() => onTabChange(id as any)}
-            className={`flex-1 py-2 px-1 flex flex-col items-center justify-center transition-colors ${
+            className={`flex-1 py-2 px-1 flex flex-col items-center justify-center transition-all duration-200 ${
               activeTab === id
-                ? 'text-blue-600 dark:text-blue-400'
+                ? 'text-blue-600 dark:text-blue-400 transform scale-105'
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
             }`}
           >
-            <Icon className={`w-6 h-6 mb-1 ${activeTab === id ? 'text-blue-600 dark:text-blue-400' : ''}`} />
-            <span className="text-xs font-medium">{label}</span>
+            <div className={`p-1 rounded-lg ${activeTab === id ? 'bg-blue-50 dark:bg-blue-900/30' : ''}`}>
+              <Icon className={`w-6 h-6 ${activeTab === id ? 'text-blue-600 dark:text-blue-400' : ''}`} />
+            </div>
+            <span className={`text-xs font-medium mt-1 ${activeTab === id ? 'text-blue-600 dark:text-blue-400' : ''}`}>
+              {label}
+            </span>
           </button>
         ))}
       </div>
