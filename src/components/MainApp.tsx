@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TopBar } from './layout/TopBar';
 import { BottomNavigation } from './layout/BottomNavigation';
 import { HomeTab } from './tabs/HomeTab';
@@ -15,25 +15,39 @@ interface MainAppProps {
 
 export const MainApp: React.FC<MainAppProps> = ({ children }) => {
   const [activeTab, setActiveTab] = useState<'home' | 'planner' | 'insights' | 'ai-tutor' | 'parent-hub'>('home');
-  const [activeChild, setActiveChild] = useState<Child>(children[0]);
-  const [notifications, setNotifications] = useState<Notification[]>([
-    {
-      id: '1',
-      title: 'Homework Due Tomorrow',
-      message: 'Math assignment due tomorrow',
-      childName: children[0]?.name || 'Child',
-      childColor: children[0]?.colorCode || '#3B82F6',
-      priority: 'high',
-      timestamp: new Date().toISOString(),
-      read: false,
-    },
-  ]);
+  const [activeChild, setActiveChild] = useState<Child | null>(children.length > 0 ? children[0] : null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    if (children.length > 0 && !activeChild) {
+      setActiveChild(children[0]);
+    }
+  }, [children, activeChild]);
+
+  useEffect(() => {
+    if (activeChild) {
+      setNotifications([
+        {
+          id: '1',
+          title: 'Homework Due Tomorrow',
+          message: 'Math assignment due tomorrow',
+          childName: activeChild.name,
+          childColor: activeChild.colorCode,
+          priority: 'high',
+          timestamp: new Date().toISOString(),
+          read: false,
+        },
+      ]);
+    }
+  }, [activeChild]);
 
   const handleChildSwitch = (child: Child) => {
     setActiveChild(child);
   };
 
   const renderActiveTab = () => {
+    if (!activeChild) return null;
+
     switch (activeTab) {
       case 'home':
         return <HomeTab activeChild={activeChild} />;
@@ -49,6 +63,17 @@ export const MainApp: React.FC<MainAppProps> = ({ children }) => {
         return <HomeTab activeChild={activeChild} />;
     }
   };
+
+  if (!activeChild) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
