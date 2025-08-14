@@ -1,12 +1,33 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft, Plus, X, User, Calendar, GraduationCap, BookOpen } from 'lucide-react';
-import { Child, Parent } from '../../types';
+import { OnboardingService } from '../../services/onboardingService';
+import { AuthService } from '../../services/authService';
+import type { Parent as DBParent, Child as DBChild } from '../../lib/supabase';
+
+// Legacy types for compatibility
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  school: string;
+  subjects: string[];
+  photo?: string;
+  colorCode: string;
+}
+
+interface Parent {
+  name: string;
+  email: string;
+  phone?: string;
+  photo?: string;
+  preferredLanguage: string;
+}
 
 interface ParentChildSetupProps {
   children: Child[];
-  parent: Parent | null;
+  parent: DBParent | null;
   onChildrenUpdate: (children: Child[]) => void;
-  onParentUpdate: (parent: Parent) => void;
+  onParentUpdate: (parent: DBParent) => void;
   onNext: () => void;
   onBack: () => void;
   onSkip: () => void;
@@ -22,20 +43,24 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
   onSkip,
 }) => {
   const [parentData, setParentData] = useState({
-    name: parent?.name || '',
+    first_name: parent?.first_name || '',
+    last_name: parent?.last_name || '',
     email: parent?.email || '',
     phone: parent?.phone || '',
   });
 
   const [currentChild, setCurrentChild] = useState({
-    name: '',
-    dateOfBirth: '',
+    first_name: '',
+    last_name: '',
+    dob: '',
     grade: '',
     board: '',
     subjects: [] as string[],
   });
 
   const [showChildForm, setShowChildForm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const boards = ['CBSE', 'ICSE', 'State Board', 'IB', 'IGCSE'];
   const grades = Array.from({ length: 12 }, (_, i) => `Grade ${i + 1}`);
@@ -63,10 +88,10 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
   };
 
   const handleAddChild = () => {
-    if (currentChild.name && currentChild.grade && currentChild.board && currentChild.subjects.length > 0) {
+    if (currentChild.first_name && currentChild.last_name && currentChild.grade && currentChild.board && currentChild.subjects.length > 0) {
       const newChild: Child = {
         id: Date.now().toString(),
-        name: currentChild.name,
+        name: `${currentChild.first_name} ${currentChild.last_name}`,
         grade: currentChild.grade,
         school: `${currentChild.board} School`, // Simplified for demo
         subjects: currentChild.subjects,
@@ -77,8 +102,9 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
       onChildrenUpdate(updatedChildren);
       
       setCurrentChild({
-        name: '',
-        dateOfBirth: '',
+        first_name: '',
+        last_name: '',
+        dob: '',
         grade: '',
         board: '',
         subjects: [],
@@ -93,18 +119,62 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
   };
 
   const handleContinue = () => {
-    if (parentData.name && parentData.email && parentData.phone && children.length > 0) {
-      onParentUpdate({
-        name: parentData.name,
-        email: parentData.email,
-        phone: parentData.phone,
-        preferredLanguage: 'English',
-      });
-      onNext();
+    if (parentData.first_name && parentData.last_name && parentData.email && parentData.phone && children.length > 0 && parent) {
+      handleSaveData();
     }
   };
 
-  const canProceed = parentData.name && parentData.email && parentData.phone && children.length > 0;
+  const handleSaveData = async () => {
+    if (!parent) return;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Update parent data
+      const { parent: updatedParent, error: parentError } = await AuthService.createOrUpdateParent({
+        google_id: parent.google_id || '',
+        first_name: parentData.first_name,
+        last_name: parentData.last_name,
+        email: parentData.email,
+        phone: parentData.phone,
+      });
+
+      if (parentError) {
+        throw new Error('Failed to update parent profile');
+      }
+
+      // Save children data
+      const childrenData = children.map(child => ({
+        first_name: child.name.split(' ')[0] || '',
+        last_name: child.name.split(' ').slice(1).join(' ') || '',
+        grade: child.grade,
+        board: child.school.replace(' School', ''),
+        subjects: child.subjects,
+      }));
+
+      const { children: savedChildren, error: childrenError } = await OnboardingService.saveChildren(
+        updatedParent!.id,
+        childrenData
+      );
+
+      if (childrenError) {
+        throw new Error('Failed to save children data');
+      }
+
+      // Log activity
+      await AuthService.logActivity(updatedParent!.id, 'profile_setup');
+
+      onParentUpdate(updatedParent!);
+      onNext();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const canProceed = parentData.first_name && parentData.last_name && parentData.email && parentData.phone && children.length > 0;
   const availableSubjects = currentChild.grade && currentChild.board 
     ? getSubjectsByGrade(currentChild.grade, currentChild.board) 
     : [];
@@ -136,6 +206,12 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
             <p className="text-gray-600 dark:text-gray-300">Let's set up your profile and add your children</p>
           </div>
 
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+            </div>
+          )}
+
           {/* Parent Profile Section */}
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
@@ -145,9 +221,16 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
             <div className="space-y-4">
               <input
                 type="text"
-                value={parentData.name}
-                onChange={(e) => setParentData(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Full Name (e.g., Raghu / Noor)"
+                value={parentData.first_name}
+                onChange={(e) => setParentData(prev => ({ ...prev, first_name: e.target.value }))}
+                placeholder="First Name"
+                className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+              />
+              <input
+                type="text"
+                value={parentData.last_name}
+                onChange={(e) => setParentData(prev => ({ ...prev, last_name: e.target.value }))}
+                placeholder="Last Name"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               />
               <input
@@ -224,16 +307,24 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
 
                 <input
                   type="text"
-                  value={currentChild.name}
-                  onChange={(e) => setCurrentChild(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Child Name (e.g., Sreshta / Aarhan / Aahil)"
+                  value={currentChild.first_name}
+                  onChange={(e) => setCurrentChild(prev => ({ ...prev, first_name: e.target.value }))}
+                  placeholder="First Name"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                />
+
+                <input
+                  type="text"
+                  value={currentChild.last_name}
+                  onChange={(e) => setCurrentChild(prev => ({ ...prev, last_name: e.target.value }))}
+                  placeholder="Last Name"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
 
                 <input
                   type="date"
-                  value={currentChild.dateOfBirth}
-                  onChange={(e) => setCurrentChild(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                  value={currentChild.dob}
+                  onChange={(e) => setCurrentChild(prev => ({ ...prev, dob: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
 
@@ -286,7 +377,7 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
 
                 <button
                   onClick={handleAddChild}
-                  disabled={!currentChild.name || !currentChild.grade || !currentChild.board || currentChild.subjects.length === 0}
+                  disabled={!currentChild.first_name || !currentChild.last_name || !currentChild.grade || !currentChild.board || currentChild.subjects.length === 0}
                   className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
                 >
                   Add This Child
@@ -311,9 +402,9 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
           <button
             onClick={handleContinue}
             disabled={!canProceed}
-            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all font-medium"
+            className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all font-medium disabled:opacity-50"
           >
-            <span>Continue</span>
+            <span>{isLoading ? 'Saving...' : 'Continue'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>

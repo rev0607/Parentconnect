@@ -1,19 +1,32 @@
 import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft, Bell, MessageSquare, Shield } from 'lucide-react';
+import { OnboardingService } from '../../services/onboardingService';
+import { AuthService } from '../../services/authService';
+import type { Parent } from '../../lib/supabase';
 
 interface PermissionsProps {
+  parent: Parent | null;
+  selectedLanguage: string;
   onNext: () => void;
   onBack: () => void;
   currentStep: number;
   totalSteps: number;
 }
 
-export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack, currentStep, totalSteps }) => {
+export const Permissions: React.FC<PermissionsProps> = ({ 
+  parent, 
+  selectedLanguage, 
+  onNext, 
+  onBack, 
+  currentStep, 
+  totalSteps 
+}) => {
   const [permissions, setPermissions] = useState({
     notifications: true,
     whatsapp: false,
-    analytics: true,
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const permissionItems = [
     {
@@ -34,6 +47,38 @@ export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack, curren
 
   const togglePermission = (key: keyof typeof permissions) => {
     setPermissions(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleContinue = async () => {
+    if (!parent) {
+      onNext();
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Save preferences including language and permissions
+      const { preferences, error: prefsError } = await OnboardingService.savePreferences(parent.id, {
+        language_preference: selectedLanguage,
+        notifications_on: permissions.notifications,
+        whatsapp_on: permissions.whatsapp,
+      });
+
+      if (prefsError) {
+        throw new Error('Failed to save preferences');
+      }
+
+      // Log activity
+      await AuthService.logActivity(parent.id, 'permissions_setup');
+
+      onNext();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -62,6 +107,12 @@ export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack, curren
             Choose how you'd like to receive updates and help us improve
           </p>
         </div>
+
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+            <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+          </div>
+        )}
 
         <div className="space-y-4 mb-8">
           {permissionItems.map((item) => (
@@ -115,10 +166,11 @@ export const Permissions: React.FC<PermissionsProps> = ({ onNext, onBack, curren
           </div>
 
           <button
-            onClick={onNext}
+            onClick={handleContinue}
+            disabled={isLoading}
             className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-4 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all font-medium"
           >
-            <span>Continue</span>
+            <span>{isLoading ? 'Saving...' : 'Continue'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 

@@ -5,7 +5,19 @@ import { ParentChildSetup } from './onboarding/ParentChildSetup';
 import { LanguageSelection } from './onboarding/LanguageSelection';
 import { Permissions } from './onboarding/Permissions';
 import { WarmWelcome } from './onboarding/WarmWelcome';
-import { Child, Parent } from '../types';
+import { OnboardingService } from '../services/onboardingService';
+import type { Parent as DBParent, Child as DBChild } from '../lib/supabase';
+
+// Legacy types for compatibility
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  school: string;
+  subjects: string[];
+  photo?: string;
+  colorCode: string;
+}
 
 interface OnboardingFlowProps {
   onComplete: (children: Child[]) => void;
@@ -14,9 +26,10 @@ interface OnboardingFlowProps {
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [children, setChildren] = useState<Child[]>([]);
-  const [parent, setParent] = useState<Parent | null>(null);
+  const [parent, setParent] = useState<DBParent | null>(null);
   const [preferredLanguage, setPreferredLanguage] = useState('English');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authUser, setAuthUser] = useState<any>(null);
 
   const steps = [
     'welcome',
@@ -43,16 +56,39 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
     setChildren(updatedChildren);
   };
 
-  const handleParentUpdate = (parentData: Parent) => {
+  const handleParentUpdate = (parentData: DBParent) => {
     setParent(parentData);
   };
 
-  const handleAuth = (authData: any) => {
+  const handleAuth = (authData: { user: any; parent: DBParent }) => {
     setIsAuthenticated(true);
+    setAuthUser(authData.user);
+    setParent(authData.parent);
   };
 
-  const handleComplete = () => {
-    onComplete(children);
+  const handleComplete = async () => {
+    // Load children from database for the main app
+    if (parent) {
+      const { children: dbChildren } = await OnboardingService.getChildrenByParentId(parent.id);
+      
+      if (dbChildren) {
+        // Convert DB children to legacy format for compatibility
+        const legacyChildren: Child[] = dbChildren.map((child, index) => ({
+          id: child.id,
+          name: `${child.first_name} ${child.last_name}`,
+          grade: child.grade,
+          school: `${child.board} School`,
+          subjects: child.subjects,
+          colorCode: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'][index % 6],
+        }));
+        
+        onComplete(legacyChildren);
+      } else {
+        onComplete(children);
+      }
+    } else {
+      onComplete(children);
+    }
   };
 
   const renderStep = () => {
@@ -83,6 +119,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       case 'language':
         return (
           <LanguageSelection
+            parent={parent}
             selectedLanguage={preferredLanguage}
             onLanguageChange={setPreferredLanguage}
             onBack={prevStep}
@@ -92,6 +129,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
       case 'permissions':
         return (
           <Permissions 
+            parent={parent}
+            selectedLanguage={preferredLanguage}
             onNext={nextStep} 
             onBack={prevStep}
             currentStep={currentStep + 1}

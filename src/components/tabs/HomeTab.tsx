@@ -1,12 +1,39 @@
 import React from 'react';
 import { Calendar, Upload, AlertCircle, Trophy, Clock } from 'lucide-react';
-import { Child } from '../../types';
+
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  school: string;
+  subjects: string[];
+  photo?: string;
+  colorCode: string;
+}
 
 interface HomeTabProps {
   activeChild: Child;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({ activeChild }) => {
+  const getPersonalizedWelcome = () => {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    
+    return `${greeting}! 👋`;
+  };
+
+  const getMotivationalMessage = () => {
+    const messages = [
+      `${activeChild.name} is ready to conquer today's learning goals!`,
+      `Let's make today amazing for ${activeChild.name}!`,
+      `${activeChild.name}'s learning journey continues with exciting challenges ahead!`,
+      `Time to unlock new achievements with ${activeChild.name}!`
+    ];
+    
+    return messages[Math.floor(Math.random() * messages.length)];
+  };
+
   const todaysTasks = [
     { id: '1', title: 'Math Homework - Chapter 5', subject: 'Math', dueTime: '6:00 PM', priority: 'high' },
     { id: '2', title: 'Science Project Review', subject: 'Science', dueTime: '8:00 PM', priority: 'medium' },
@@ -23,17 +50,20 @@ export const HomeTab: React.FC<HomeTabProps> = ({ activeChild }) => {
       {/* AI Daily Summary */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl p-4 border border-blue-100 dark:border-blue-800">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-          Good Morning! 👋
+          {getPersonalizedWelcome()}
         </h2>
         <p className="text-gray-600 dark:text-gray-300 mb-3">
-          Here's {activeChild.name}'s plan for today. They have 3 tasks scheduled and are performing well in Math.
+          {getMotivationalMessage()} They have {todaysTasks.length} tasks scheduled and are performing well in {activeChild.subjects[0] || 'their studies'}.
         </p>
         <div className="flex space-x-2">
           <span className="px-3 py-1 bg-blue-100 dark:bg-blue-800 text-blue-800 dark:text-blue-200 rounded-full text-sm font-medium">
-            3 Tasks Today
+            {todaysTasks.length} Tasks Today
           </span>
           <span className="px-3 py-1 bg-green-100 dark:bg-green-800 text-green-800 dark:text-green-200 rounded-full text-sm font-medium">
             On Track
+          </span>
+          <span className="px-3 py-1 bg-purple-100 dark:bg-purple-800 text-purple-800 dark:text-purple-200 rounded-full text-sm font-medium">
+            {activeChild.grade}
           </span>
         </div>
       </div>

@@ -1,7 +1,10 @@
 import React from 'react';
 import { ArrowLeft, Globe, Check } from 'lucide-react';
+import { OnboardingService } from '../../services/onboardingService';
+import type { Parent } from '../../lib/supabase';
 
 interface LanguageSelectionProps {
+  parent: Parent | null;
   selectedLanguage: string;
   onLanguageChange: (language: string) => void;
   onBack: () => void;
@@ -22,11 +25,35 @@ const languages = [
 ];
 
 export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
+  parent,
   selectedLanguage,
   onLanguageChange,
   onBack,
   onContinue
 }) => {
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleContinue = async () => {
+    if (!parent) {
+      onContinue();
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      // Save language preference (will be completed in next step with other preferences)
+      // For now, just continue to next step
+      onContinue();
+    } catch (err) {
+      setError('Failed to save language preference');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900 dark:to-indigo-900">
       {/* Header */}
@@ -79,6 +106,12 @@ export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
             </p>
           </div>
 
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+            </div>
+          )}
+
           {/* Language Options */}
           <div className="space-y-3">
             {languages.map((language) => (
@@ -121,10 +154,11 @@ export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm border-t border-gray-200 dark:border-gray-700">
         <div className="max-w-md mx-auto">
           <button
-            onClick={onContinue}
+            onClick={handleContinue}
+            disabled={isLoading}
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
           >
-            Continue
+            {isLoading ? 'Saving...' : 'Continue'}
           </button>
         </div>
       </div>

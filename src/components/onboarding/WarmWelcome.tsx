@@ -1,6 +1,18 @@
 import React from 'react';
 import { ArrowLeft, Sparkles, Heart, Zap } from 'lucide-react';
-import { Parent, Child } from '../../types';
+import { AuthService } from '../../services/authService';
+import type { Parent, Child as DBChild } from '../../lib/supabase';
+
+// Legacy Child type for compatibility
+interface Child {
+  id: string;
+  name: string;
+  grade: string;
+  school: string;
+  subjects: string[];
+  photo?: string;
+  colorCode: string;
+}
 
 interface WarmWelcomeProps {
   parent: Parent | null;
@@ -24,7 +36,7 @@ export const WarmWelcome: React.FC<WarmWelcomeProps> = ({
       return "Welcome aboard! Your learning journey starts now.";
     }
 
-    const parentName = parent.name.split(' ')[0]; // Get first name
+    const parentName = parent.first_name; // Get first name
     const firstChild = children[0];
     
     const messages = [
@@ -34,6 +46,14 @@ export const WarmWelcome: React.FC<WarmWelcomeProps> = ({
     ];
     
     return messages[Math.floor(Math.random() * messages.length)];
+  };
+
+  const handleComplete = async () => {
+    if (parent) {
+      // Log completion of onboarding
+      await AuthService.logActivity(parent.id, 'onboarding_complete');
+    }
+    onComplete();
   };
 
   const features = [
@@ -137,7 +157,7 @@ export const WarmWelcome: React.FC<WarmWelcomeProps> = ({
 
           {/* Go to Dashboard Button */}
           <button
-            onClick={onComplete}
+            onClick={handleComplete}
             className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all duration-200 font-semibold text-lg"
           >
             Go to Dashboard

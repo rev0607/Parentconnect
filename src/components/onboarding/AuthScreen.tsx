@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { ArrowLeft, Phone, Mail } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, Mail, Loader2 } from 'lucide-react';
+import { AuthService } from '../../services/authService';
 
 interface AuthScreenProps {
   onAuth: (authData: any) => void;
@@ -9,26 +10,68 @@ interface AuthScreenProps {
 }
 
 export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, onSkip }) => {
-  const [phoneNumber, setPhoneNumber] = useState('');
-  const [showOTP, setShowOTP] = useState(false);
-  const [otp, setOtp] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handlePhoneAuth = () => {
-    if (phoneNumber.length >= 10) {
-      setShowOTP(true);
+  useEffect(() => {
+    // Check if user is already authenticated
+    const checkAuth = async () => {
+      const { session } = await AuthService.getCurrentSession();
+      if (session?.user) {
+        handleAuthSuccess(session.user);
+      }
+    };
+    
+    checkAuth();
+  }, []);
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await AuthService.signInWithGoogle();
+      
+      if (error) {
+        setError(error.message);
+        setIsLoading(false);
+        return;
+      }
+
+      // The actual authentication will be handled by the redirect
+      // We'll check for the session in useEffect
+    } catch (err) {
+      setError('Failed to sign in with Google. Please try again.');
+      setIsLoading(false);
     }
   };
 
-  const handleOTPVerify = () => {
-    if (otp.length === 6) {
-      onAuth({ phone: phoneNumber, verified: true });
+  const handleAuthSuccess = async (user: any) => {
+    try {
+      // Create or update parent profile
+      const { parent, error } = await AuthService.createOrUpdateParent({
+        google_id: user.id,
+        first_name: user.user_metadata?.given_name || '',
+        last_name: user.user_metadata?.family_name || '',
+        email: user.email || '',
+        phone: user.user_metadata?.phone || ''
+      });
+
+      if (error) {
+        setError('Failed to create profile. Please try again.');
+        return;
+      }
+
+      // Log authentication activity
+      if (parent) {
+        await AuthService.logActivity(parent.id, 'authentication');
+      }
+
+      onAuth({ user, parent });
       onNext();
+    } catch (err) {
+      setError('Failed to complete authentication. Please try again.');
     }
-  };
-
-  const handleSocialAuth = (provider: string) => {
-    onAuth({ provider, verified: true });
-    onNext();
   };
 
   return (
@@ -54,111 +97,74 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
       <div className="flex-1 flex items-center justify-center p-6">
         <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-8">
           <div className="text-center mb-8">
+            <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <Mail className="w-8 h-8 text-white" />
+            </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              {showOTP ? 'Verify Your Phone' : 'Sign Up / Login'}
+              Welcome to Smart Parent AI
             </h2>
             <p className="text-gray-600 dark:text-gray-300">
-              {showOTP ? 'Enter the 6-digit code sent to your phone' : 'Choose your preferred sign-in method'}
+              Sign in to create your personalized learning dashboard
             </p>
           </div>
 
-          {!showOTP ? (
-            <div className="space-y-4">
-              {/* Phone Number Input */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Phone Number
-                </label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                  <input
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    placeholder="+91 98765 43210"
-                    className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <button
-                onClick={handlePhoneAuth}
-                disabled={phoneNumber.length < 10}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
-              >
-                Continue with Phone (OTP)
-              </button>
-
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or continue with</span>
-                </div>
-              </div>
-
-              {/* Social Auth Buttons */}
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleSocialAuth('google')}
-                  className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-3 px-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">G</span>
-                  </div>
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">Continue with Google</span>
-                </button>
-
-                <button
-                  onClick={() => handleSocialAuth('apple')}
-                  className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-3 px-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                >
-                  <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">🍎</span>
-                  </div>
-                  <span className="text-gray-700 dark:text-gray-300 font-medium">Continue with Apple</span>
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-6">
-              <div className="text-center">
-                <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                  Code sent to {phoneNumber}
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Enter OTP
-                </label>
-                <input
-                  type="text"
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value)}
-                  placeholder="123456"
-                  maxLength={6}
-                  className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-center text-lg tracking-widest"
-                />
-              </div>
-
-              <button
-                onClick={handleOTPVerify}
-                disabled={otp.length !== 6}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors font-medium"
-              >
-                Verify & Continue
-              </button>
-
-              <button
-                onClick={() => setShowOTP(false)}
-                className="w-full text-blue-600 dark:text-blue-400 hover:underline text-sm"
-              >
-                Change phone number
-              </button>
+          {error && (
+            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
             </div>
           )}
+
+          <div className="space-y-4">
+            {/* Google Sign In Button */}
+            <button
+              onClick={handleGoogleSignIn}
+              disabled={isLoading}
+              className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-4 px-6 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
+              ) : (
+                <div className="w-5 h-5 bg-gradient-to-r from-red-500 to-yellow-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-bold">G</span>
+                </div>
+              )}
+              <span className="text-gray-700 dark:text-gray-300 font-medium">
+                {isLoading ? 'Signing in...' : 'Continue with Google'}
+              </span>
+            </button>
+
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Coming Soon</span>
+              </div>
+            </div>
+
+            {/* Future Auth Methods */}
+            <div className="space-y-3 opacity-50">
+              <button
+                disabled
+                className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-3 px-4 rounded-lg cursor-not-allowed"
+              >
+                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">📱</span>
+                </div>
+                <span className="text-gray-500 dark:text-gray-400 font-medium">Continue with Phone (OTP)</span>
+              </button>
+
+              <button
+                disabled
+                className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-3 px-4 rounded-lg cursor-not-allowed"
+              >
+                <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs">🍎</span>
+                </div>
+                <span className="text-gray-500 dark:text-gray-400 font-medium">Continue with Apple</span>
+              </button>
+            </div>
+          </div>
 
           {/* Progress Indicator */}
           <div className="flex justify-center mt-8">
@@ -170,6 +176,10 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onAuth, onNext, onBack, 
               ))}
             </div>
           </div>
+
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-6">
+            By continuing, you agree to our Terms of Service and Privacy Policy
+          </p>
         </div>
       </div>
     </div>
