@@ -68,16 +68,19 @@ A comprehensive AI-powered parenting assistant that helps parents manage their c
    cp src/.env.example .env
    ```
    
-   Add your Supabase credentials:
+   The environment variables are already configured:
    ```env
-   VITE_SUPABASE_URL=your_supabase_project_url
-   VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+   VITE_SUPABASE_URL=https://oxbespcvpszcawxzmcyf.supabase.co
+   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
    ```
 
 4. **Set up Supabase**
-   - Create a new Supabase project
+   - Supabase project is already configured
    - Run the migration files in `supabase/migrations/`
-   - Configure Google OAuth in Authentication → Providers
+   - Configure Google OAuth in Authentication → Providers with:
+     - Client ID: `699296606466-q5addc5s8t5askbh1va9k0hslvtdb7ib.apps.googleusercontent.com`
+     - Client Secret: `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`
+     - Redirect URL: `https://oxbespcvpszcawxzmcyf.supabase.co/auth/v1/callback`
 
 5. **Start development server**
    ```bash
