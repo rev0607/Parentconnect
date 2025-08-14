@@ -95,45 +95,114 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
     try {
       console.log('Initiating Google sign in...');
-      console.log('Supabase URL:', import.meta.env.VITE_SUPABASE_URL);
-      console.log('Supabase Anon Key exists:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
+      
+      // Test Supabase connection first
+      const { data: testData, error: testError } = await supabase.auth.getSession();
+      console.log('Supabase connection test:', { testData, testError });
       
       // Check if Supabase is properly configured
       if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
         throw new Error('Supabase configuration missing. Please check your environment variables.');
       }
       
+      console.log('Starting Google OAuth flow...');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}${window.location.pathname}`,
+          redirectTo: window.location.origin,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-            scope: 'openid email profile'
-          }
+          },
+          skipBrowserRedirect: false
         }
       });
       
+      console.log('OAuth response:', { data, error });
+      
       if (error) {
-        console.error('Google sign in error:', error);
-        setDebugInfo({ error: error.message, code: error.status });
-        setError(error.message);
-        setIsLoading(false);
-        return;
+        console.error('Google OAuth error:', error);
+        throw error;
       }
 
-      console.log('Google sign in initiated:', data);
-      setDebugInfo({ success: true, data });
-      // The redirect will happen automatically
-      // Don't set loading to false here as we're redirecting
+      if (data?.url) {
+        console.log('Redirecting to Google OAuth URL:', data.url);
+        window.location.href = data.url;
+      } else {
+        console.log('No redirect URL received from Supabase');
+        setDebugInfo({ noRedirectUrl: true, data });
+      }
+      
     } catch (err) {
       console.error('Sign in error:', err);
-      setDebugInfo({ catchError: err instanceof Error ? err.message : 'Unknown error' });
-      setError('Failed to sign in with Google. Please try again.');
+      setDebugInfo({ 
+        catchError: err instanceof Error ? err.message : 'Unknown error',
+        errorDetails: err
+      });
+      setError(err instanceof Error ? err.message : 'Failed to sign in with Google. Please try again.');
       setIsLoading(false);
     }
   };
+
+  // Handle OAuth callback when user returns from Google
+  useEffect(() => {
+    const handleAuthCallback = async () => {
+      console.log('Checking for auth callback...');
+      
+      // Check URL for OAuth callback parameters
+      const urlParams = new URLSearchParams(window.location.search);
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      
+      const code = urlParams.get('code');
+      const accessToken = hashParams.get('access_token');
+      const error = urlParams.get('error');
+      
+      console.log('URL params:', { code: !!code, accessToken: !!accessToken, error });
+      
+      if (error) {
+        console.error('OAuth error in URL:', error);
+        setError(`Authentication failed: ${error}`);
+        return;
+      }
+      
+      if (code || accessToken) {
+        console.log('OAuth callback detected, processing...');
+        setIsLoading(true);
+        
+        try {
+          // Let Supabase handle the OAuth callback
+          const { data, error: sessionError } = await supabase.auth.getSession();
+          console.log('Session after callback:', { data, sessionError });
+          
+          if (sessionError) {
+            throw sessionError;
+          }
+          
+          if (data.session?.user) {
+            console.log('Authentication successful!');
+            setDebugInfo({ authSuccess: true, user: data.session.user.email });
+            // The auth state listener will handle the rest
+          } else {
+            // Try to exchange the code for a session
+            const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code || '');
+            console.log('Code exchange result:', { exchangeData, exchangeError });
+            
+            if (exchangeError) {
+              throw exchangeError;
+            }
+          }
+        } catch (err) {
+          console.error('OAuth callback processing error:', err);
+          setError('Authentication failed during callback processing.');
+          setDebugInfo({ callbackError: err instanceof Error ? err.message : 'Unknown callback error' });
+        } finally {
+          setIsLoading(false);
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      }
+    };
+
 
   // Show success state if authenticated
   if (isAuthenticated && authUser) {
