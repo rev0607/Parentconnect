@@ -203,6 +203,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       }
     };
 
+    handleAuthCallback();
+  }, []);
 
   // Show success state if authenticated
   if (isAuthenticated && authUser) {
