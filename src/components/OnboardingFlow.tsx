@@ -30,12 +30,23 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
   const [currentStep, setCurrentStep] = useState(0);
   const [children, setChildren] = useState<Child[]>([]);
   const [parent, setParent] = useState<DBParent | null>(null);
+  const [skipAuth, setSkipAuth] = useState(false);
   const [preferredLanguage, setPreferredLanguage] = useState('English');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authUser, setAuthUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const handleSkip = () => {
+  const handleSkipAuth = () => {
+    console.log('Skipping authentication, continuing with profile setup');
+    setSkipAuth(true);
+    setIsAuthenticated(false);
+    setAuthUser(null);
+    setIsLoading(false);
+    // Move to profile setup step (step 3, index 2)
+    setCurrentStep(2);
+  };
+
+  const handleCompleteSkip = () => {
     if (onSkip) {
       onSkip();
     } else {
@@ -227,14 +238,14 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
   const renderStep = () => {
     switch (steps[currentStep]) {
       case 'welcome':
-        return <WelcomeScreen onNext={nextStep} onSkip={handleSkip} />;
+        return <WelcomeScreen onNext={nextStep} onSkip={handleCompleteSkip} />;
       case 'auth':
         return (
           <AuthScreen
             onAuth={() => {}} // Auth is now handled by state listener
             onNext={nextStep}
             onBack={prevStep}
-            onSkip={handleSkip}
+            onSkip={handleSkipAuth}
             isAuthenticated={isAuthenticated}
             authUser={authUser}
           />
@@ -244,17 +255,19 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
           <ParentChildSetup
             children={children}
             parent={parent}
+            skipAuth={skipAuth}
             onChildrenUpdate={handleChildrenUpdate}
             onParentUpdate={handleParentUpdate}
             onNext={nextStep}
             onBack={prevStep}
-            onSkip={handleSkip}
+            onSkip={handleCompleteSkip}
           />
         );
       case 'language':
         return (
           <LanguageSelection
             parent={parent}
+            skipAuth={skipAuth}
             selectedLanguage={preferredLanguage}
             onLanguageChange={setPreferredLanguage}
             onBack={prevStep}
@@ -265,6 +278,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
         return (
           <Permissions 
             parent={parent}
+            skipAuth={skipAuth}
             selectedLanguage={preferredLanguage}
             onNext={nextStep} 
             onBack={prevStep}
@@ -277,6 +291,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
           <WarmWelcome
             parent={parent}
             children={children}
+            skipAuth={skipAuth}
             onComplete={handleComplete}
             onBack={prevStep}
             currentStep={currentStep + 1}
@@ -284,7 +299,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
           />
         );
       default:
-        return <WelcomeScreen onNext={nextStep} onSkip={() => setCurrentStep(steps.length - 1)} />;
+        return <WelcomeScreen onNext={nextStep} onSkip={handleCompleteSkip} />;
     }
   };
 
