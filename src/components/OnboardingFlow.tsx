@@ -23,9 +23,10 @@ interface Child {
 
 interface OnboardingFlowProps {
   onComplete: (children: Child[]) => void;
+  onSkip?: () => void;
 }
 
-export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) => {
+export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSkip }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [children, setChildren] = useState<Child[]>([]);
   const [parent, setParent] = useState<DBParent | null>(null);
@@ -33,6 +34,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authUser, setAuthUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleSkip = () => {
+    if (onSkip) {
+      onSkip();
+    } else {
+      // Fallback: complete with empty children array
+      onComplete([]);
+    }
+  };
 
   const handleAuthSuccess = useCallback(async (user: any) => {
     try {
@@ -217,14 +227,14 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
   const renderStep = () => {
     switch (steps[currentStep]) {
       case 'welcome':
-        return <WelcomeScreen onNext={nextStep} onSkip={() => setCurrentStep(steps.length - 1)} />;
+        return <WelcomeScreen onNext={nextStep} onSkip={handleSkip} />;
       case 'auth':
         return (
           <AuthScreen
             onAuth={() => {}} // Auth is now handled by state listener
             onNext={nextStep}
             onBack={prevStep}
-            onSkip={() => setCurrentStep(steps.length - 1)}
+            onSkip={handleSkip}
             isAuthenticated={isAuthenticated}
             authUser={authUser}
           />
@@ -238,7 +248,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete }) =>
             onParentUpdate={handleParentUpdate}
             onNext={nextStep}
             onBack={prevStep}
-            onSkip={() => setCurrentStep(steps.length - 1)}
+            onSkip={handleSkip}
           />
         );
       case 'language':
