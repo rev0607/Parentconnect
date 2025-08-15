@@ -26,7 +26,6 @@ interface Parent {
 interface ParentChildSetupProps {
   children: Child[];
   parent: DBParent | null;
-  skipAuth?: boolean;
   onChildrenUpdate: (children: Child[]) => void;
   onParentUpdate: (parent: DBParent) => void;
   onNext: () => void;
@@ -37,7 +36,6 @@ interface ParentChildSetupProps {
 export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
   children,
   parent,
-  skipAuth = false,
   onChildrenUpdate,
   onParentUpdate,
   onNext,
@@ -127,7 +125,7 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
   };
 
   const handleSaveData = async () => {
-    if (!parent) return;
+    if (!parent || skipAuth) return;
     
     setIsLoading(true);
     setError(null);

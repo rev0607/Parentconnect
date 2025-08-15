@@ -26,6 +26,7 @@ const languages = [
 
 export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
   parent,
+  skipAuth = false,
   selectedLanguage,
   onLanguageChange,
   onBack,
@@ -35,7 +36,7 @@ export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
   const [error, setError] = React.useState<string | null>(null);
 
   const handleContinue = async () => {
-    if (!parent) {
+    if (!parent || skipAuth) {
       onContinue();
       return;
     }

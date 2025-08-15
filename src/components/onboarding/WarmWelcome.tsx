@@ -49,7 +49,7 @@ export const WarmWelcome: React.FC<WarmWelcomeProps> = ({
   };
 
   const handleComplete = async () => {
-    if (parent) {
+    if (parent && !skipAuth) {
       // Log completion of onboarding
       await AuthService.logActivity(parent.id, 'onboarding_complete');
     }

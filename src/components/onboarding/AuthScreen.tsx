@@ -346,6 +346,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-6">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
+
+          {/* Skip Auth Option */}
+          <div className="mt-4 text-center">
+            <button
+              onClick={onSkip}
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
+            >
+              Skip authentication and continue with profile setup
+            </button>
+          </div>
         </div>
       </div>
     </div>

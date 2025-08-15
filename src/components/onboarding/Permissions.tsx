@@ -50,7 +50,7 @@ export const Permissions: React.FC<PermissionsProps> = ({
   };
 
   const handleContinue = async () => {
-    if (!parent) {
+    if (!parent || skipAuth) {
       onNext();
       return;
     }
