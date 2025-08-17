@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Loader2 } from 'lucide-react';
-import { AuthService } from '../../services/authService';
+import { ArrowLeft, Mail, Lock, User, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface AuthScreenProps {
@@ -20,9 +19,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   isAuthenticated = false,
   authUser = null 
 }) => {
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: ''
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [debugInfo, setDebugInfo] = useState<any>(null);
+  const [success, setSuccess] = useState<string | null>(null);
 
   // If already authenticated, show success state and auto-advance
   useEffect(() => {
@@ -30,82 +39,81 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       console.log('User is already authenticated, auto-advancing...');
       setTimeout(() => {
         onNext();
-      }, 1500); // Give user time to see success message
+      }, 1500);
     }
   }, [isAuthenticated, authUser, onNext]);
 
-  useEffect(() => {
-    // Handle URL hash parameters (OAuth callback)
-    const handleOAuthCallback = async () => {
-      console.log('Checking for OAuth callback...');
-      console.log('Current URL:', window.location.href);
-      console.log('Hash:', window.location.hash);
-      console.log('Search:', window.location.search);
-      
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const searchParams = new URLSearchParams(window.location.search);
-      const accessToken = hashParams.get('access_token');
-      const code = searchParams.get('code');
-      
-      if (accessToken || code) {
-        console.log('OAuth callback detected:', { accessToken: !!accessToken, code: !!code });
-        setIsLoading(true);
-        
-        try {
-          // Let Supabase handle the OAuth callback
-          const { data, error } = await supabase.auth.getSession();
-          console.log('Session after OAuth:', data, error);
-          
-          if (error) throw error;
-          
-          if (data.session?.user) {
-            console.log('Session established from OAuth callback');
-            setDebugInfo({ oauthSuccess: true, user: data.session.user.email });
-            // The auth state listener in OnboardingFlow will handle this
-          } else {
-            console.log('No session found after OAuth callback');
-            setDebugInfo({ oauthCallback: true, noSession: true });
-          }
-        } catch (err) {
-          console.error('OAuth callback error:', err);
-          setDebugInfo({ oauthError: err instanceof Error ? err.message : 'Unknown OAuth error' });
-          setError('Authentication failed. Please try again.');
-        } finally {
-          setIsLoading(false);
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname + window.location.search.replace(/[?&](code|state)=[^&]*/g, '').replace(/^&/, '?').replace(/^\?$/, ''));
-        }
-      } else {
-        console.log('No OAuth callback detected');
-      }
-    };
+  const handleSignUp = async () => {
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
 
-    handleOAuthCallback();
-  }, []);
-
-  const handleGoogleSignIn = async () => {
-    if (isAuthenticated) {
-      onNext();
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
       return;
     }
 
     setIsLoading(true);
     setError(null);
-    setDebugInfo(null);
 
     try {
-      console.log('Initiating Google sign in...');
-      
-      // Test Supabase connection first
-      const { data: testData, error: testError } = await supabase.auth.getSession();
-      console.log('Supabase connection test:', { testData, testError });
-      
-      // Check if Supabase is properly configured
-      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
-        throw new Error('Supabase configuration missing. Please check your environment variables.');
+      const { data, error } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            full_name: `${formData.firstName} ${formData.lastName}`
+          }
+        }
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        setSuccess('Account created successfully! You can now sign in.');
+        setAuthMode('signin');
+        setFormData(prev => ({ ...prev, password: '', confirmPassword: '', firstName: '', lastName: '' }));
       }
-      
-      console.log('Starting Google OAuth flow...');
+    } catch (err: any) {
+      console.error('Sign up error:', err);
+      setError(err.message || 'Failed to create account');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (error) throw error;
+
+      if (data.user) {
+        console.log('Sign in successful:', data.user);
+        // The auth state listener in OnboardingFlow will handle the rest
+      }
+    } catch (err: any) {
+      console.error('Sign in error:', err);
+      setError(err.message || 'Failed to sign in');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -113,98 +121,30 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
-          },
-          skipBrowserRedirect: false
+          }
         }
       });
-      
-      console.log('OAuth response:', { data, error });
-      
-      if (error) {
-        console.error('Google OAuth error:', error);
-        throw error;
-      }
+
+      if (error) throw error;
 
       if (data?.url) {
-        console.log('Redirecting to Google OAuth URL:', data.url);
         window.location.href = data.url;
-      } else {
-        console.log('No redirect URL received from Supabase');
-        setDebugInfo({ noRedirectUrl: true, data });
       }
-      
-    } catch (err) {
-      console.error('Sign in error:', err);
-      setDebugInfo({ 
-        catchError: err instanceof Error ? err.message : 'Unknown error',
-        errorDetails: err
-      });
-      setError(err instanceof Error ? err.message : 'Failed to sign in with Google. Please try again.');
+    } catch (err: any) {
+      console.error('Google sign in error:', err);
+      setError(err.message || 'Failed to sign in with Google');
       setIsLoading(false);
     }
   };
 
-  // Handle OAuth callback when user returns from Google
-  useEffect(() => {
-    const handleAuthCallback = async () => {
-      console.log('Checking for auth callback...');
-      
-      // Check URL for OAuth callback parameters
-      const urlParams = new URLSearchParams(window.location.search);
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      
-      const code = urlParams.get('code');
-      const accessToken = hashParams.get('access_token');
-      const error = urlParams.get('error');
-      
-      console.log('URL params:', { code: !!code, accessToken: !!accessToken, error });
-      
-      if (error) {
-        console.error('OAuth error in URL:', error);
-        setError(`Authentication failed: ${error}`);
-        return;
-      }
-      
-      if (code || accessToken) {
-        console.log('OAuth callback detected, processing...');
-        setIsLoading(true);
-        
-        try {
-          // Let Supabase handle the OAuth callback
-          const { data, error: sessionError } = await supabase.auth.getSession();
-          console.log('Session after callback:', { data, sessionError });
-          
-          if (sessionError) {
-            throw sessionError;
-          }
-          
-          if (data.session?.user) {
-            console.log('Authentication successful!');
-            setDebugInfo({ authSuccess: true, user: data.session.user.email });
-            // The auth state listener will handle the rest
-          } else {
-            // Try to exchange the code for a session
-            const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code || '');
-            console.log('Code exchange result:', { exchangeData, exchangeError });
-            
-            if (exchangeError) {
-              throw exchangeError;
-            }
-          }
-        } catch (err) {
-          console.error('OAuth callback processing error:', err);
-          setError('Authentication failed during callback processing.');
-          setDebugInfo({ callbackError: err instanceof Error ? err.message : 'Unknown callback error' });
-        } finally {
-          setIsLoading(false);
-          // Clean up URL
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }
-      }
-    };
-
-    handleAuthCallback();
-  }, []);
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (authMode === 'signup') {
+      handleSignUp();
+    } else {
+      handleSignIn();
+    }
+  };
 
   // Show success state if authenticated
   if (isAuthenticated && authUser) {
@@ -248,10 +188,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <Mail className="w-8 h-8 text-white" />
             </div>
             <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Welcome to Smart Parent AI
+              {authMode === 'signup' ? 'Create Account' : 'Welcome Back'}
             </h2>
             <p className="text-gray-600 dark:text-gray-300">
-              Sign in to create your personalized learning dashboard
+              {authMode === 'signup' 
+                ? 'Create your Smart Parent AI account' 
+                : 'Sign in to your Smart Parent AI account'
+              }
             </p>
           </div>
 
@@ -261,76 +204,178 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
             </div>
           )}
 
-          {/* Debug Info in Development */}
-          {process.env.NODE_ENV === 'development' && debugInfo && (
-            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-              <p className="text-yellow-800 dark:text-yellow-200 text-xs font-mono">
-                Debug: {JSON.stringify(debugInfo, null, 2)}
-              </p>
+          {success && (
+            <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+              <p className="text-green-800 dark:text-green-200 text-sm">{success}</p>
             </div>
           )}
 
-          <div className="space-y-4">
-            {/* Debug Info */}
-            {process.env.NODE_ENV === 'development' && (
-              <div className="text-xs text-gray-500 p-2 bg-gray-100 rounded">
-                <p>Auth Status: {isAuthenticated ? 'Authenticated' : 'Not authenticated'}</p>
-                <p>Loading: {isLoading ? 'Yes' : 'No'}</p>
-                <p>Supabase URL: {import.meta.env.VITE_SUPABASE_URL ? 'Set' : 'Missing'}</p>
-                <p>Supabase Key: {import.meta.env.VITE_SUPABASE_ANON_KEY ? 'Set' : 'Missing'}</p>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Name fields for signup */}
+            {authMode === 'signup' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    First Name
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.firstName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="First name"
+                      required
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Last Name
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <input
+                      type="text"
+                      value={formData.lastName}
+                      onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                      placeholder="Last name"
+                      required
+                    />
+                  </div>
+                </div>
               </div>
             )}
 
-            {/* Google Sign In Button */}
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="your.email@example.com"
+                  required
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  placeholder="Enter your password"
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm Password for signup */}
+            {authMode === 'signup' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  Confirm Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={formData.confirmPassword}
+                    onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    className="w-full pl-10 pr-12 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Confirm your password"
+                    required
+                    minLength={6}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Submit Button */}
             <button
-              onClick={handleGoogleSignIn}
+              type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-4 px-6 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full flex items-center justify-center space-x-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-3 px-4 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition-all font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
-                <Loader2 className="w-5 h-5 animate-spin text-gray-600" />
+                <Loader2 className="w-5 h-5 animate-spin" />
               ) : (
-                <div className="w-5 h-5 bg-gradient-to-r from-red-500 to-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-bold">G</span>
-                </div>
+                <span>{authMode === 'signup' ? 'Create Account' : 'Sign In'}</span>
               )}
-              <span className="text-gray-700 dark:text-gray-300 font-medium">
-                {isLoading ? 'Signing in...' : isAuthenticated ? 'Continue to Setup' : 'Continue with Google'}
-              </span>
             </button>
+          </form>
 
-            <div className="relative my-6">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Coming Soon</span>
-              </div>
+          {/* Toggle Auth Mode */}
+          <div className="mt-6 text-center">
+            <button
+              onClick={() => {
+                setAuthMode(authMode === 'signup' ? 'signin' : 'signup');
+                setError(null);
+                setSuccess(null);
+                setFormData(prev => ({ ...prev, password: '', confirmPassword: '', firstName: '', lastName: '' }));
+              }}
+              className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+            >
+              {authMode === 'signup' 
+                ? 'Already have an account? Sign In' 
+                : "Don't have an account? Sign Up"
+              }
+            </button>
+          </div>
+
+          {/* Divider */}
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300 dark:border-gray-600"></div>
             </div>
-
-            {/* Future Auth Methods */}
-            <div className="space-y-3 opacity-50">
-              <button
-                disabled
-                className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-3 px-4 rounded-lg cursor-not-allowed"
-              >
-                <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">📱</span>
-                </div>
-                <span className="text-gray-500 dark:text-gray-400 font-medium">Continue with Phone (OTP)</span>
-              </button>
-
-              <button
-                disabled
-                className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-3 px-4 rounded-lg cursor-not-allowed"
-              >
-                <div className="w-5 h-5 bg-black rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs">🍎</span>
-                </div>
-                <span className="text-gray-500 dark:text-gray-400 font-medium">Continue with Apple</span>
-              </button>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white dark:bg-gray-800 text-gray-500">Or continue with</span>
             </div>
           </div>
+
+          {/* Google Sign In Button */}
+          <button
+            onClick={handleGoogleSignIn}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center space-x-3 border border-gray-300 dark:border-gray-600 py-3 px-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <div className="w-5 h-5 bg-gradient-to-r from-red-500 to-yellow-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-xs font-bold">G</span>
+            </div>
+            <span className="text-gray-700 dark:text-gray-300 font-medium">
+              Continue with Google
+            </span>
+          </button>
 
           {/* Progress Indicator */}
           <div className="flex justify-center mt-8">
@@ -346,16 +391,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-6">
             By continuing, you agree to our Terms of Service and Privacy Policy
           </p>
-
-          {/* Skip Auth Option */}
-          <div className="mt-4 text-center">
-            <button
-              onClick={onSkip}
-              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 underline"
-            >
-              Skip authentication and continue with profile setup
-            </button>
-          </div>
         </div>
       </div>
     </div>

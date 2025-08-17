@@ -58,8 +58,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
   const handleAuthSuccess = useCallback(async (user: any) => {
     try {
       console.log('Handling auth success for user:', user);
-      console.log('User metadata:', user.user_metadata);
-      console.log('User identities:', user.identities);
       
       // Create or update parent profile
       const { parent: parentData, error } = await AuthService.createOrUpdateParent({
@@ -67,10 +65,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
         first_name: user.user_metadata?.full_name?.split(' ')[0] || 
                    user.user_metadata?.name?.split(' ')[0] || 
                    user.user_metadata?.given_name || 
+                   user.user_metadata?.first_name ||
                    'User',
         last_name: user.user_metadata?.full_name?.split(' ').slice(1).join(' ') || 
                   user.user_metadata?.name?.split(' ').slice(1).join(' ') || 
                   user.user_metadata?.family_name || 
+                  user.user_metadata?.last_name ||
                   '',
         email: user.email || '',
         phone: user.user_metadata?.phone_number || user.phone || ''
@@ -137,7 +137,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log('Auth state changed:', event, session);
-      console.log('Current step before auth change:', currentStep);
       
       if (event === 'SIGNED_IN' && session?.user && mounted) {
         console.log('User signed in, calling handleAuthSuccess');
@@ -229,7 +228,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ onComplete, onSk
             <span className="text-white font-bold text-2xl">AI</span>
           </div>
           <p className="text-gray-600 dark:text-gray-300">Checking authentication...</p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Current step: {currentStep + 1}</p>
         </div>
       </div>
     );

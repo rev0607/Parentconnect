@@ -6,6 +6,7 @@ import type { Parent } from '../../lib/supabase';
 
 interface PermissionsProps {
   parent: Parent | null;
+  skipAuth: boolean;
   selectedLanguage: string;
   onNext: () => void;
   onBack: () => void;
@@ -15,6 +16,7 @@ interface PermissionsProps {
 
 export const Permissions: React.FC<PermissionsProps> = ({ 
   parent, 
+  skipAuth,
   selectedLanguage, 
   onNext, 
   onBack, 
@@ -67,6 +69,7 @@ export const Permissions: React.FC<PermissionsProps> = ({
       });
 
       if (prefsError) {
+        console.error('Preferences save error:', prefsError);
         throw new Error('Failed to save preferences');
       }
 
@@ -75,6 +78,7 @@ export const Permissions: React.FC<PermissionsProps> = ({
 
       onNext();
     } catch (err) {
+      console.error('Permissions continue error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
@@ -92,7 +96,11 @@ export const Permissions: React.FC<PermissionsProps> = ({
           <ArrowLeft className="w-5 h-5" />
           <span>Back</span>
         </button>
-        <div className="w-6"></div> {/* Spacer */}
+        <div className="w-6">
+          {skipAuth && (
+            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Demo</span>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
@@ -111,6 +119,15 @@ export const Permissions: React.FC<PermissionsProps> = ({
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
             <p className="text-red-800 dark:text-red-200 text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Debug Info in Development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+            <p className="text-yellow-800 dark:text-yellow-200 text-xs">
+              Debug: Skip Auth: {skipAuth ? 'Yes' : 'No'}, Parent: {parent ? 'Yes' : 'No'}
+            </p>
           </div>
         )}
 

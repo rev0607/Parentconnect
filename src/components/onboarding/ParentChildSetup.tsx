@@ -15,17 +15,10 @@ interface Child {
   colorCode: string;
 }
 
-interface Parent {
-  name: string;
-  email: string;
-  phone?: string;
-  photo?: string;
-  preferredLanguage: string;
-}
-
 interface ParentChildSetupProps {
   children: Child[];
   parent: DBParent | null;
+  skipAuth: boolean;
   onChildrenUpdate: (children: Child[]) => void;
   onParentUpdate: (parent: DBParent) => void;
   onNext: () => void;
@@ -36,6 +29,7 @@ interface ParentChildSetupProps {
 export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
   children,
   parent,
+  skipAuth,
   onChildrenUpdate,
   onParentUpdate,
   onNext,
@@ -46,7 +40,7 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
     first_name: parent?.first_name || '',
     last_name: parent?.last_name || '',
     email: parent?.email || '',
-    phone: parent?.phone || '',
+    phone: parent?.phone || ''
   });
 
   const [currentChild, setCurrentChild] = useState({
@@ -119,13 +113,27 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
   };
 
   const handleContinue = () => {
-    if (parentData.first_name && parentData.last_name && parentData.email && parentData.phone && children.length > 0 && parent) {
+    // Check required fields
+    if (!parentData.first_name || !parentData.last_name || !parentData.email || children.length === 0) {
+      setError('Please fill in all required fields and add at least one child');
+      return;
+    }
+
+    if (skipAuth) {
+      // For skip auth mode, just continue to next step
+      onNext();
+      return;
+    }
+
+    if (parent) {
       handleSaveData();
+    } else {
+      setError('Authentication required to save data');
     }
   };
 
   const handleSaveData = async () => {
-    if (!parent || skipAuth) return;
+    if (!parent) return;
     
     setIsLoading(true);
     setError(null);
@@ -141,6 +149,7 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
       });
 
       if (parentError) {
+        console.error('Parent update error:', parentError);
         throw new Error('Failed to update parent profile');
       }
 
@@ -159,6 +168,7 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
       );
 
       if (childrenError) {
+        console.error('Children save error:', childrenError);
         throw new Error('Failed to save children data');
       }
 
@@ -168,13 +178,14 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
       onParentUpdate(updatedParent!);
       onNext();
     } catch (err) {
+      console.error('Save data error:', err);
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const canProceed = parentData.first_name && parentData.last_name && parentData.email && parentData.phone && children.length > 0;
+  const canProceed = parentData.first_name && parentData.last_name && parentData.email && children.length > 0;
   const availableSubjects = currentChild.grade && currentChild.board 
     ? getSubjectsByGrade(currentChild.grade, currentChild.board) 
     : [];
@@ -190,12 +201,11 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
           <ArrowLeft className="w-5 h-5" />
           <span>Back</span>
         </button>
-        <button
-          onClick={onSkip}
-          className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 font-medium"
-        >
-          Skip for now
-        </button>
+        {skipAuth && (
+          <span className="text-sm text-blue-600 dark:text-blue-400 font-medium">
+            Demo Mode
+          </span>
+        )}
       </div>
 
       {/* Main Content */}
@@ -212,6 +222,15 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
             </div>
           )}
 
+          {/* Debug Info in Development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-6 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <p className="text-yellow-800 dark:text-yellow-200 text-xs">
+                Debug: Skip Auth: {skipAuth ? 'Yes' : 'No'}, Parent: {parent ? 'Yes' : 'No'}, Children: {children.length}
+              </p>
+            </div>
+          )}
+
           {/* Parent Profile Section */}
           <div className="mb-8">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
@@ -223,28 +242,31 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
                 type="text"
                 value={parentData.first_name}
                 onChange={(e) => setParentData(prev => ({ ...prev, first_name: e.target.value }))}
-                placeholder="First Name"
+                placeholder="First Name *"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                required
               />
               <input
                 type="text"
                 value={parentData.last_name}
                 onChange={(e) => setParentData(prev => ({ ...prev, last_name: e.target.value }))}
-                placeholder="Last Name"
+                placeholder="Last Name *"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                required
               />
               <input
                 type="email"
                 value={parentData.email}
                 onChange={(e) => setParentData(prev => ({ ...prev, email: e.target.value }))}
-                placeholder="Email"
+                placeholder="Email *"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                required
               />
               <input
                 type="tel"
                 value={parentData.phone}
                 onChange={(e) => setParentData(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="Phone (Required)"
+                placeholder="Phone (Optional)"
                 className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
               />
             </div>
@@ -292,6 +314,13 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
               </div>
             )}
 
+            {children.length === 0 && (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                <GraduationCap className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No children added yet. Click "Add Child" to get started.</p>
+              </div>
+            )}
+
             {/* Child Form */}
             {showChildForm && (
               <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 space-y-4">
@@ -309,22 +338,25 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
                   type="text"
                   value={currentChild.first_name}
                   onChange={(e) => setCurrentChild(prev => ({ ...prev, first_name: e.target.value }))}
-                  placeholder="First Name"
+                  placeholder="First Name *"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  required
                 />
 
                 <input
                   type="text"
                   value={currentChild.last_name}
                   onChange={(e) => setCurrentChild(prev => ({ ...prev, last_name: e.target.value }))}
-                  placeholder="Last Name"
+                  placeholder="Last Name *"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                  required
                 />
 
                 <input
                   type="date"
                   value={currentChild.dob}
                   onChange={(e) => setCurrentChild(prev => ({ ...prev, dob: e.target.value }))}
+                  placeholder="Date of Birth (Optional)"
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                 />
 
@@ -333,8 +365,9 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
                     value={currentChild.grade}
                     onChange={(e) => setCurrentChild(prev => ({ ...prev, grade: e.target.value }))}
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    required
                   >
-                    <option value="">Select Grade</option>
+                    <option value="">Select Grade *</option>
                     {grades.map(grade => (
                       <option key={grade} value={grade}>{grade}</option>
                     ))}
@@ -344,8 +377,9 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
                     value={currentChild.board}
                     onChange={(e) => setCurrentChild(prev => ({ ...prev, board: e.target.value }))}
                     className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                    required
                   >
-                    <option value="">Select Board</option>
+                    <option value="">Select Board *</option>
                     {boards.map(board => (
                       <option key={board} value={board}>{board}</option>
                     ))}
@@ -355,7 +389,7 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
                 {availableSubjects.length > 0 && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                      Subjects (Select at least one)
+                      Subjects (Select at least one) *
                     </label>
                     <div className="grid grid-cols-2 gap-2">
                       {availableSubjects.map((subject) => (
@@ -378,7 +412,7 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
                 <button
                   onClick={handleAddChild}
                   disabled={!currentChild.first_name || !currentChild.last_name || !currentChild.grade || !currentChild.board || currentChild.subjects.length === 0}
-                  className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                  className="w-full bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
                 >
                   Add This Child
                 </button>
@@ -407,6 +441,10 @@ export const ParentChildSetup: React.FC<ParentChildSetupProps> = ({
             <span>{isLoading ? 'Saving...' : 'Continue'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
+
+          <p className="text-xs text-gray-500 dark:text-gray-400 text-center mt-4">
+            * Required fields. You can add more children later.
+          </p>
         </div>
       </div>
     </div>

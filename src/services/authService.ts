@@ -53,7 +53,7 @@ export class AuthService {
       const { data: existingParent, error: findError } = await supabase
         .from('parents')
         .select('*')
-        .or(`google_id.eq.${userData.google_id},email.eq.${userData.email}`)
+        .or(`google_id.eq."${userData.google_id}",email.eq."${userData.email}"`)
         .single();
 
       if (findError && findError.code !== 'PGRST116') {
@@ -105,7 +105,7 @@ export class AuthService {
       const { data, error } = await supabase
         .from('parents')
         .select('*')
-        .eq('google_id', googleId)
+        .eq('google_id', `"${googleId}"`)
         .single();
 
       if (error && error.code !== 'PGRST116') {

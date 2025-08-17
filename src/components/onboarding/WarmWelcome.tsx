@@ -17,6 +17,7 @@ interface Child {
 interface WarmWelcomeProps {
   parent: Parent | null;
   children: Child[];
+  skipAuth: boolean;
   onComplete: () => void;
   onBack: () => void;
   currentStep: number;
@@ -26,6 +27,7 @@ interface WarmWelcomeProps {
 export const WarmWelcome: React.FC<WarmWelcomeProps> = ({ 
   parent, 
   children, 
+  skipAuth,
   onComplete, 
   onBack, 
   currentStep, 
@@ -85,7 +87,11 @@ export const WarmWelcome: React.FC<WarmWelcomeProps> = ({
           <ArrowLeft className="w-5 h-5" />
           <span>Back</span>
         </button>
-        <div className="w-6"></div> {/* Spacer */}
+        <div className="w-6">
+          {skipAuth && (
+            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Demo</span>
+          )}
+        </div>
       </div>
 
       {/* Main Content */}
@@ -138,6 +144,16 @@ export const WarmWelcome: React.FC<WarmWelcomeProps> = ({
                   </div>
                 ))}
               </div>
+            </div>
+          )}
+
+          {/* Demo Mode Notice */}
+          {skipAuth && (
+            <div className="mb-8 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+              <p className="text-yellow-800 dark:text-yellow-200 text-sm">
+                <strong>Demo Mode:</strong> You're using Smart Parent AI in demo mode. 
+                Sign up to save your data permanently.
+              </p>
             </div>
           )}
 

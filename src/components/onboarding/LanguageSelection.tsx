@@ -5,6 +5,7 @@ import type { Parent } from '../../lib/supabase';
 
 interface LanguageSelectionProps {
   parent: Parent | null;
+  skipAuth: boolean;
   selectedLanguage: string;
   onLanguageChange: (language: string) => void;
   onBack: () => void;
@@ -71,7 +72,11 @@ export const LanguageSelection: React.FC<LanguageSelectionProps> = ({
           <h1 className="text-xl font-bold text-gray-800 dark:text-white">Language Preference</h1>
         </div>
         
-        <div className="w-16" /> {/* Spacer for centering */}
+        <div className="w-16">
+          {skipAuth && (
+            <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">Demo</span>
+          )}
+        </div>
       </div>
 
       {/* Progress Indicator */}
